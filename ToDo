@@ -1,0 +1,3 @@
+add !quote.search/scan/s !quote.rsearch/rscan/r/regex.
+make triggers and options case insensitive.
+use a database instead of files.
