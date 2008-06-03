@@ -5,6 +5,7 @@ require 'IRC'
 #ToDo: Make it less static (multiple channels, multiple nicks... maybe even multiple servers?)
 
 SERVER	= "idp.ath.cx"
+#SERVER	= "irc.rizon.net"
 PORT	= 6667
 CHANNEL	= "#idp"
 NICK	= "rubybot"
@@ -40,9 +41,9 @@ def identify(pw)
 	$bot.send_message("NICKSERV", "IDENTIFY #{pw}")
 	print "\n\tidentified for #{NICK}!"	if DEBUG
 end
-def quit(message = "QUIT : Quit ordered by user") #later with server
+def quit(message = "Quit ordered by user!") #later with server
 	print "\n\tquit from server!\n"
-	IRCConnection.send_to_server(message)
+	IRCConnection.send_to_server("QUIT :" + message)
 	IRCConnection.quit
 end
 #End of methods
@@ -67,10 +68,12 @@ IRCEvent.add_callback('privmsg') { |event|
 		var = event.message[1..-1].split
 		if (var[0] =~ /\S\./) #if there are options
 			count = 0
-			option = var[0].split('.')
-			options.each { |opt| option[opt.intern] = true unless (count += 1) == 1 }
+			options = var[0].split('.')
+			$option = {}
+			options.each { |opt| $option[opt.intern] = true unless (count += 1) == 1 }
 			var[0] = options[0] 
-			options.delete
+			options = nil
+			$options = true
 		end
 		if (event.message =~ /^!\S/) #start of action section
 			print "\t! matched.\n"
@@ -88,6 +91,15 @@ IRCEvent.add_callback('privmsg') { |event|
 						act(event.channel,var[1..-1].join(" ")) unless event.channel == NICK || var[0] != 'do'
 					end
 				when 'quote':
+					if $options
+						output = ""
+						output += "Name: - " if $option[:name]
+						output += "Date: xx-xx-xxxx " if $option[:date]
+						output  = "Name: - Date: xx-xx-xxxx" if $option[:info]
+						print "sending info: #{output}\n"
+						if event.channel != NICK then msg(event.channel, output)
+						else msg(event.from, output) end
+					end
 					print "sending quote: "
 					file = File.open('quotes.txt')
 					file.max
@@ -108,22 +120,25 @@ IRCEvent.add_callback('privmsg') { |event|
 			print "\t? matched."
 			case var[0]
 				when 'debug'
-					puts "1: #{event.stats[0]}"
-					puts "2: #{event.stats[1]}"
-					puts "3: #{event.stats[2]}"
-					puts "4: #{event.stats[3]}"
-					puts "*: #{event.channel}"
-					puts $bot.channels
+					puts
+					puts "event.stats[1]: #{event.stats[0]} = nick"
+					puts "event.stats[2]: #{event.stats[1]} = address"
+					puts "event.stats[3]: #{event.stats[2]} = event"
+					puts "event.stats[4]: #{event.stats[3]} = origin"
+					puts "event.channel: #{event.channel}  = origin"
+					puts
+					puts "$bot.channels = #{$bot.channels}"
 					$bot.channels.each { |ch| puts ch.name }
 			end
 		elsif (event.message =~ /^`\S/) #end of information section & start of system section
 			print "\t` matched."
 			case var[0]
 				when 'quit'
-					quit("quit order sent by: #{event.from}")
+					quit("quit order sent by: #{event.from}") if event.stats[1] =~ /@his\.dojo$/
 			end
 		end
 	end #of detecting triggers
+	print "\n"
 }
 #End of event handlers
 
