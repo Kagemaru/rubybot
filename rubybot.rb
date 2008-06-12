@@ -1,11 +1,13 @@
+#require 'dbi'
+require 'rubygems'
 require 'IRC'
 
 #Configurations for the bot.
 #ToDo: Move to a seperate file.
 #ToDo: Make it less static (multiple channels, multiple nicks... maybe even multiple servers?)
 
-SERVER	= "idp.ath.cx"
-#SERVER	= "irc.rizon.net"
+#SERVER	= "idp.ath.cx"
+SERVER	= "irc.rizon.net"
 PORT	= 6667
 CHANNEL	= "#idp"
 NICK	= "rubybot"
@@ -66,6 +68,7 @@ IRCEvent.add_callback('privmsg') { |event|
 	##Checks if someone requests an action.
 	if (event.message =~ /^[!?`]\S/)
 		var = event.message[1..-1].split
+		var[0].downcase!
 		if (var[0] =~ /\S\./) #if there are options
 			count = 0
 			options = var[0].split('.')
