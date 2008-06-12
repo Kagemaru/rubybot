@@ -1,3 +1,5 @@
+#require 'dbi'
+require 'rubygems'
 require 'IRC'
 
 #Configurations for the bot.
