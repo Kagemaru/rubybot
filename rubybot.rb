@@ -1,18 +1,7 @@
 require 'IRC'
 
 #Configurations for the bot.
-#ToDo: Move to a seperate file.
-#ToDo: Make it less static (multiple channels, multiple nicks... maybe even multiple servers?)
-
-SERVER	= "idp.ath.cx"
-#SERVER	= "irc.rizon.net"
-PORT	= 6667
-CHANNEL	= "#idp"
-NICK	= "rubybot"
-PASS	= "mysticfire"
-NAME	= "no one really"
-DEBUG   = true
-
+require 'config.rb'
 #End of configuration
 
 #Bot initialization
@@ -53,7 +42,7 @@ end
 ##Identify for the nick and let it join some channels after the MOTD
 IRCEvent.add_callback('endofmotd') {
 	join(CHANNEL) 
-	identify("mysticfire")
+	identify(PASS)
 }
 
 ##Greet users on join
@@ -66,6 +55,7 @@ IRCEvent.add_callback('privmsg') { |event|
 	##Checks if someone requests an action.
 	if (event.message =~ /^[!?`]\S/)
 		var = event.message[1..-1].split
+		var[0].downcase!
 		if (var[0] =~ /\S\./) #if there are options
 			count = 0
 			options = var[0].split('.')
@@ -134,7 +124,7 @@ IRCEvent.add_callback('privmsg') { |event|
 			print "\t` matched."
 			case var[0]
 				when 'quit'
-					quit("quit order sent by: #{event.from}") if event.stats[1] =~ /@his\.dojo$/
+					quit("quit order sent by: #{event.from}") if event.stats[1] =~ /^Kagemaru@/
 			end
 		end
 	end #of detecting triggers
