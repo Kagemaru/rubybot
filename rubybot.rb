@@ -1,4 +1,4 @@
-#require 'dbi'
+require 'dbi'
 require 'rubygems'
 require 'IRC'
 
@@ -36,6 +36,12 @@ def quit(message = "Quit ordered by user!") #later with server
 	print "\n\tquit from server!\n"
 	IRCConnection.send_to_server("QUIT :" + message)
 	IRCConnection.quit
+end
+def mysql_query(qry)
+	print "\tSending query: #{qry}" if DEBUG
+	sql = DBI.connect("DBI:Mysql:test:idp.ath.cx", "test", "test")
+	query = sql.prepare(qry)
+	return query.execute
 end
 #End of methods
 
@@ -83,11 +89,23 @@ IRCEvent.add_callback('privmsg') { |event|
 						act(event.channel,var[1..-1].join(" ")) unless event.channel == NICK || var[0] != 'do'
 					end
 				when 'quote':
+					max = mysql_query("SELECT COUNT(*) FROM quotes;") #fetch number of quotes in DB
+					puts "\nQuotes in DB = #{max}" if DEBUG
+					randnr = random(max) + 1
+					quote = []
+					res = mysql_query("SELECT * FROM quotes WHERE nr=#{randnr}")
+					res.fetch_hash { |row|
+						row.each { |key,value|
+							if (key == 'uploader') then quote[key.intern] = value.intern
+							elsif (key == 'about') then quote[key.intern] = value.split(":").intern
+							else quote[key.intern] = value end
+						}
+					}
 					if $options
 						output = ""
-						output += "Name: - " if $option[:name]
-						output += "Date: xx-xx-xxxx " if $option[:date]
-						output  = "Name: - Date: xx-xx-xxxx" if $option[:info]
+						output += "Uploader: #{quote[:uploader]} " if $option[:uploader] || $option[:info]
+						output += "About: #{quote[:about].join(" ")}" if $option[:uploader] || $option[:info]
+						output += "Date: #{quote[:date]}" if $option[:date] || $option[:info]
 						print "sending info: #{output}\n"
 						if event.channel != NICK then msg(event.channel, output)
 						else msg(event.from, output) end
