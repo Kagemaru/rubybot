@@ -32,17 +32,23 @@ def identify(pw)
 	$bot.send_message("NICKSERV", "IDENTIFY #{pw}")
 	print "\n\tidentified for #{NICK}!"	if DEBUG
 end
-def quit(message = "Quit ordered by user!") #later with server
+def quit(message) #later with server
+	if (!message) then message = "Quit ordered by user!"
 	print "\n\tquit from server!\n"
 	IRCConnection.send_to_server("QUIT :" + message)
 	IRCConnection.quit
 end
-def mysql_query(qry)
-	print "\tSending query: #{qry}" if DEBUG
-	sql = DBI.connect("DBI:Mysql:test:idp.ath.cx", "test", "test")
-	query = sql.prepare(qry)
-	return query.execute
+def mysql_query(query)
+	print "\tSending query: #{query}" if DEBUG
+	sql = DBI.connect("DBI:Mysql:kaminari:idp.ath.cx", "kaminari", "f4HSqTr9Yz3BAMnH")
+	return sql.execute(query)
 end
+def mysql_count(table)
+	print "\tGetting number of rows in #{table}"
+	sql = DBI.connect("DBI:Mysql:kaminari:idp.ath.cx", "kaminari", "f4HSqTr9Yz3BAMnH")
+	return sql.select_all("SELECT COUNT(*) FROM #{table};").to_s.to_i
+end
+
 #End of methods
 
 #Event handlers. React on channel/user/serverevents
@@ -89,17 +95,16 @@ IRCEvent.add_callback('privmsg') { |event|
 						act(event.channel,var[1..-1].join(" ")) unless event.channel == NICK || var[0] != 'do'
 					end
 				when 'quote':
-					max = mysql_query("SELECT COUNT(*) FROM quotes;") #fetch number of quotes in DB
-					puts "\nQuotes in DB = #{max}" if DEBUG
-					randnr = random(max) + 1
-					quote = []
-					res = mysql_query("SELECT * FROM quotes WHERE nr=#{randnr}")
-					res.fetch_hash { |row|
-						row.each { |key,value|
-							if (key == 'uploader') then quote[key.intern] = value.intern
-							elsif (key == 'about') then quote[key.intern] = value.split(":").intern
-							else quote[key.intern] = value end
-						}
+					quote = {}
+					max = mysql_count("quotes") #fetch number of quotes in DB
+					randnr = rand(max)
+					puts "\n\tQuotes in DB = #{max}" if DEBUG
+					res = mysql_query("SELECT * FROM quotes LIMIT #{randnr},1;")
+					row = res.fetch_hash
+					row.each { |key,value|
+						if (key.to_s == 'uploader') then quote[key.intern] = value.intern
+						elsif (key.to_s == 'about') && (value) then quote[key.intern] = value.split(":").intern
+						else quote[key.intern] = value end
 					}
 					if $options
 						output = ""
@@ -110,6 +115,9 @@ IRCEvent.add_callback('privmsg') { |event|
 						if event.channel != NICK then msg(event.channel, output)
 						else msg(event.from, output) end
 					end
+                    msg(CHANNEL,randnr.to_s + ": " + quote[:quote])
+
+=begin
 					print "sending quote: "
 					file = File.open('quotes.txt')
 					file.max
@@ -125,6 +133,7 @@ IRCEvent.add_callback('privmsg') { |event|
 						end
 					end
 					file.close
+=end
 			end #of action case
 		elsif (event.message =~ /^\?\S/)	 #end of action section & start of information section
 			print "\t? matched."
@@ -144,8 +153,9 @@ IRCEvent.add_callback('privmsg') { |event|
 			print "\t` matched."
 			case var[0]
 				when 'quit'
-					quit("quit order sent by: #{event.from}") if event.stats[1] =~ /^Kagemaru@/
-			end
+					if event.stats[1] =~ /@his.dojo$/ then quit("quit order sent by: #{event.from}") 
+					else msg(CHANNEL,"You're not authorized to do this. #{event.stats[1]}") end
+				end
 		end
 	end #of detecting triggers
 	print "\n"
