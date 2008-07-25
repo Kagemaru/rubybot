@@ -1,4 +1,4 @@
-require 'dbi'
+require 'dbi' #MySQL layer
 require 'rubygems'
 require 'IRC'
 
