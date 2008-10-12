@@ -106,6 +106,8 @@ IRCEvent.add_callback('privmsg') { |event|
 			var[0] = options[0] 
 			options = nil
 			$options = true
+		else
+			$option = {}
 		end
 		if (event.message =~ /^!\S/) #start of action section
 			print "\t! matched.\n"
@@ -192,7 +194,8 @@ IRCEvent.add_callback('privmsg') { |event|
 					end
 					file.close
 =end
-				when 'roll'
+				when 'roll', 'dice'
+					dice = nil 
 					dice = {}
 					if $options
 						if $option[:secret] || $option[:s]
@@ -202,19 +205,23 @@ IRCEvent.add_callback('privmsg') { |event|
 						elsif $option[:detail] || $option[:d]
 							dice[:detail] = true
 						end	
+					else
+					   $option = nil
 					end	
 					if var[1] =~ /(\d*)d(\d+)($|\+\d+|-\d+)/
 						puts var[1]+ " is a valid die roll of #{$1}d#{$2}#{$3}" if DEBUG
 						puts dice.inspect if DEBUG
-						dice[:times]  = ($1 ? $1.to_i : 1)
+						puts "$1=#{$1}"
+						dice[:times]  = (($1)&&($1 != "") ? $1.to_i : 1)
 						dice[:die]    = $2.to_i
-						dice[:mod]    = ($3 ? $3.to_i : 0)
+						dice[:mod]    = (($3)&&($3 != "") ? $3.to_i : 0)
 						dice[:result] = 0
 						dice[:rolls]  = []
 						for i in 1..dice[:times] do
+							if dice[:die] == 0 then 
 							dice[:rolls][i-1] = (rand(dice[:die])+1)
 							dice[:result] += dice[:rolls][i-1] 
-							puts "\n\tRoll #{i}: #{dice[:rolls][i-1]}. Total: #{dice[:result]}."
+							puts "\tRoll #{i}: #{dice[:rolls][i-1]}. Total: #{dice[:result]}."
 						end
 						dice[:result] += dice[:mod]
 						if dice[:detail]
@@ -229,7 +236,7 @@ IRCEvent.add_callback('privmsg') { |event|
 							msg(event.stats[0],dice[:msg])
 						elsif dice[:mtype] == "notice"
 							notice(event.stats[0],dice[:msg])
-						elsif event.stats[2] == "PRIVMSG"
+						elsif event.stats[2] == "PRIVMSG" && event.channel =~ /^(?!#)/
 							msg(event.stats[0],dice[:msg])
 						else
 							msg(event.channel,dice[:msg])
