@@ -7,34 +7,35 @@ require 'config.rb'
 #End of configuration
 
 #Bot initialization
-$bot = IRC.new(NICK, SERVER, PORT, NAME)
+$server= IRC.new($bot['server'][0]['nicks'][0], $bot['server'][0]['address'], $bot['server'][0]['port'], $bot['server'][0]['fname'])
+#$server= IRC.new(NICK, SERVER, PORT, NAME)
 
 #End of initialization
 
 #methods
 def msg(target, message)
-	print "\n\tSaying: '#{message}' to #{target}\n" if DEBUG
-	$bot.send_message(target, message)
+	print "\n\tSaying: '#{message}' to #{target}\n" if $bot['debug']
+	$server.send_message(target, message)
 end
 def notice(target,notice)
-	print "\n\tSending the NOTICE: '#{notice}' to #{target}\n" if DEBUG
-	$bot.send_notice(target, notice)
+	print "\n\tSending the NOTICE: '#{notice}' to #{target}\n" if $bot['debug']
+	$server.send_notice(target, notice)
 end
 def act(target, action)
-	print "\n\tsending action: '#{action}' to #{target}\n" if DEBUG
-	$bot.send_action(target, action)
+	print "\n\tsending action: '#{action}' to #{target}\n" if $bot['debug']
+	$server.send_action(target, action)
 end
 def join(channel)
-	$bot.add_channel(channel)
-	print "\n\tjoined channel: #{channel}" if DEBUG
+	$server.add_channel(channel)
+	print "\n\tjoined channel: #{channel}" if $bot['debug']
 end
 def part(channel)
-	$bot.part_channel(channel)
-	print "\n\tleft channel: #{channel}" if DEBUG
+	$server.part_channel(channel)
+	print "\n\tleft channel: #{channel}" if $bot['debug']
 end
 def identify(pw)
-	$bot.send_message("NICKSERV", "IDENTIFY #{pw}")
-	print "\n\tidentified for #{NICK}!"	if DEBUG
+	$server.send_message("NICKSERV", "IDENTIFY #{pw}")
+	print "\n\tidentified for #{NICK}!"	if $bot['debug']
 end
 def quit(message) #later with server
 	if (!message) then message = "Quit ordered by user!" end
@@ -43,7 +44,7 @@ def quit(message) #later with server
 	IRCConnection.quit
 end
 def mysql_query(query)
-	print "\tSending query: #{query}" if DEBUG
+	print "\tSending query: #{query}" if $bot['debug']
 	sql = DBI.connect("DBI:Mysql:kaminari:idp.ath.cx", "kaminari", "f4HSqTr9Yz3BAMnH")
 	return sql.execute(query)
 end
@@ -76,17 +77,18 @@ end
 
 ##Identify for the nick and let it join some channels after the MOTD
 IRCEvent.add_callback('endofmotd') {
-	join(CHANNEL) 
+	$bot['server'][0]['channels'].each { |c| join(c) }
+	#join(CHANNEL)
 	identify(PASS)
 }
 
 ##Greet users on join
 IRCEvent.add_callback('join') { |event|
-	msg(event.channel, "Hello #{event.from}!") unless (event.from == NICK)
+	msg(event.channel, "Hello #{event.from}!") unless (event.from == $server.nick)
 }
 ##Reacts on channel/private messages
 IRCEvent.add_callback('privmsg') { |event|
-	print "\n#{event.from}: #{event.message}" if DEBUG
+	print "\n#{event.from}: #{event.message}" if $bot['debug']
 	##Checks if someone requests an action.
 	if (event.message =~ /^[!?`]\S/)
 		var = event.message[1..-1].split
@@ -114,7 +116,7 @@ IRCEvent.add_callback('privmsg') { |event|
 			case var[0]
 				when 'say', 'do'
 					if var[1] =~ /^#/ 
-						$bot.channels.each { |channel|
+						$server.channels.each { |channel|
 							if channel.name == var[1]
 								msg(var[1],var[2..-1].join(" ")) unless var[0] != 'say'
 								act(var[1],var[2..-1].join(" ")) unless var[0] != 'do'
@@ -128,13 +130,13 @@ IRCEvent.add_callback('privmsg') { |event|
 					quote = {}
 					max = mysql_count("quotes") #fetch number of quotes in DB
 					randnr = rand(max)
-					puts "\n\tQuotes in DB = #{max} and randnr = #{randnr}" if DEBUG
-					puts "\n\tvar[1] = #{var[1]} is set? #{(var[1]?true:false)}  and is Integer? #{var[1].to_i.is_a?(Integer)}" if DEBUG
+					puts "\n\tQuotes in DB = #{max} and randnr = #{randnr}" if $bot['debug']
+					puts "\n\tvar[1] = #{var[1]} is set? #{(var[1]?true:false)}  and is Integer? #{var[1].to_i.is_a?(Integer)}" if $bot['debug']
 					if var[1] && var[1].to_i.is_a?(Integer) && var[1].to_i <= max
-						puts "\n\tFetching Quote #{var[1]}" if DEBUG
+						puts "\n\tFetching Quote #{var[1]}" if $bot['debug']
 						res = mysql_query("SELECT * FROM quotes LIMIT #{var[1].to_i - 1},1;")
 					else
-						puts "\n\tFetching random Quote" if DEBUG
+						puts "\n\tFetching random Quote" if $bot['debug']
 						res = mysql_query("SELECT * FROM quotes LIMIT #{randnr},1;")
 					end
 					row = res.fetch_hash
@@ -175,7 +177,7 @@ IRCEvent.add_callback('privmsg') { |event|
 						if event.channel != NICK then msg(event.channel, output)
 						else msg(event.from, output) end
 					end
-                    msg(CHANNEL,quote[:id].to_s + ": " + quote[:quote])
+                    msg(event.channel,quote[:id].to_s + ": " + quote[:quote])
 
 =begin
 					print "sending quote: "
@@ -209,8 +211,8 @@ IRCEvent.add_callback('privmsg') { |event|
 					   $option = nil
 					end	
 					if var[1] =~ /(\d*)d(\d+)($|\+\d+|-\d+)/
-						puts var[1]+ " is a valid die roll of #{$1}d#{$2}#{$3}" if DEBUG
-						puts dice.inspect if DEBUG
+						puts var[1]+ " is a valid die roll of #{$1}d#{$2}#{$3}" if $bot['debug']
+						puts dice.inspect if $bot['debug']
 						puts "$1=#{$1}"
 						dice[:times]  = (($1)&&($1 != "") ? $1.to_i : 1)
 						dice[:die]    = $2.to_i
@@ -218,8 +220,8 @@ IRCEvent.add_callback('privmsg') { |event|
 						dice[:result] = 0
 						dice[:rolls]  = []
 						for i in 1..dice[:times] do
-							if dice[:die] == 0 then 
-							dice[:rolls][i-1] = (rand(dice[:die])+1)
+							if dice[:die] == 0 then dice[:rolls][i-1] = rand(dice[:die])
+							else dice[:rolls][i-1] = (rand(dice[:die])+1) end
 							dice[:result] += dice[:rolls][i-1] 
 							puts "\tRoll #{i}: #{dice[:rolls][i-1]}. Total: #{dice[:result]}."
 						end
@@ -255,8 +257,8 @@ IRCEvent.add_callback('privmsg') { |event|
 					puts "event.stats[3]: #{event.stats[3]} = origin"
 					puts "event.channel: #{event.channel}  = origin"
 					puts
-					puts "$bot.channels = #{$bot.channels}"
-					$bot.channels.each { |ch| puts ch.name }
+					puts "$server.channels = #{$server.channels}"
+					$server.channels.each { |ch| puts ch.name }
 			end
 		elsif (event.message =~ /^`\S/) #end of information section & start of system section
 			print "\t` matched."
@@ -271,4 +273,4 @@ IRCEvent.add_callback('privmsg') { |event|
 }
 #End of event handlers
 
-$bot.connect
+$server.connect
